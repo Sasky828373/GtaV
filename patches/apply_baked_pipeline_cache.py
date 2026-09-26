@@ -3,7 +3,7 @@ from pathlib import Path
 p=Path("src/native-renderer/src/native_renderer.cpp")
 s=p.read_text()
 old="static std::unordered_map<uint64_t,NativePipelineCacheEntry> pipelineCache;\nstatic std::mutex graphicsPipelineCreateMutex;"
-new="static std::unordered_map<uint64_t,NativePipelineCacheEntry> pipelineCache;\\nstatic std::unordered_map<uint64_t,VkPipeline> graphicsBakedPipelineCache;\\nstatic std::mutex graphicsPipelineCreateMutex;"
+new="static std::unordered_map<uint64_t,NativePipelineCacheEntry> pipelineCache;\nstatic std::unordered_map<uint64_t,VkPipeline> graphicsBakedPipelineCache;\nstatic std::mutex graphicsPipelineCreateMutex;"
 assert old in s
 s=s.replace(old,new,1)
 old=""" VkGraphicsPipelineCreateInfo pci{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};pci.pNext=&rendering;pci.stageCount=2;pci.pStages=stages;pci.pVertexInputState=&vi;pci.pInputAssemblyState=&ia;pci.pViewportState=&vp;pci.pRasterizationState=&rs;pci.pMultisampleState=&ms;pci.pDepthStencilState=&ds;pci.pColorBlendState=&cb;pci.pDynamicState=&dyn;pci.layout=layout;
