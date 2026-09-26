@@ -1,0 +1,8 @@
+{
+  "baseline_apk": "GTAV-GOLD.apk",
+  "baseline_sha256": "c7db44f0decdbe07ca2302ac4a4c75728eb085530f4ea1b2da9639b35e05fd93",
+  "renderer_sha256": "0560f9209bf12117320d884d63a48b23b1abe4c963cc74ff4e6f6a48431eaaac",
+  "libgtav_sha256": "2e7a8b43b47429af7c49645ca23fc7c7c741c71087fa6ea4178b0fac718cf02a",
+  "graphics_status": "confirmed-correct",
+  "policy": "immutable-gold-baseline"
+}
