@@ -1,0 +1,73 @@
+name: Build Gold Native Pipeline Fix
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "patches/**"
+      - ".github/workflows/build-native-fix.yml"
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Gold APK repo
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Fetch exact graphics-correct renderer source baseline
+        uses: actions/checkout@v4
+        with:
+          repository: Sasky828373/android-port-analysis
+          ref: ecce8d64591cdc4dd40662d261453995d575f7b1
+          path: src
+      - name: Verify Gold APK
+        run: |
+          git lfs pull
+          echo "c7db44f0decdbe07ca2302ac4a4c75728eb085530f4ea1b2da9639b35e05fd93  GTAV-GOLD.apk" | sha256sum -c -
+      - name: Apply baked-state pipeline cache fix
+        run: python3 patches/apply_baked_pipeline_cache.py
+      - name: Build ARM64 native renderer
+        run: |
+          set -euo pipefail
+          rm -rf src/native-renderer/third_party/dxbc-spirv
+          git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/doitsujin/dxbc-spirv.git src/native-renderer/third_party/dxbc-spirv
+          git -C src/native-renderer/third_party/dxbc-spirv submodule update --init --recursive --depth 1
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ninja-build cmake
+          cmake -S src/native-renderer -B src/native-renderer/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-28
+          cmake --build src/native-renderer/build --parallel 2
+          test -s src/native-renderer/build/libgtav_native_renderer.so
+          strings src/native-renderer/build/libgtav_native_renderer.so | grep -F native-pipeline-baked-reused
+      - name: Inject into exact Gold APK
+        run: |
+          set -euo pipefail
+          rm -rf work out
+          mkdir -p work out
+          unzip -q GTAV-GOLD.apk -d work
+          cp src/native-renderer/build/libgtav_native_renderer.so work/lib/arm64-v8a/libgtav_native_renderer.so
+          cd work
+          zip -q -r -0 ../out/GTAV-GOLD-BAKED-CACHE-UNSIGNED.apk .
+          cd ..
+      - name: Align sign and verify
+        run: |
+          set -euo pipefail
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          "$BT/zipalign" -f -P 16 4 out/GTAV-GOLD-BAKED-CACHE-UNSIGNED.apk out/GTAV-GOLD-BAKED-CACHE-ALIGNED.apk
+          keytool -genkeypair -noprompt -keystore out/gold.keystore -storepass android -keypass android -alias gold -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=GTAV Gold,O=Android,C=DE"
+          "$BT/apksigner" sign --ks out/gold.keystore --ks-pass pass:android --key-pass pass:android --out out/GTAV-GOLD-BAKED-CACHE-SIGNED.apk out/GTAV-GOLD-BAKED-CACHE-ALIGNED.apk
+          "$BT/apksigner" verify --verbose out/GTAV-GOLD-BAKED-CACHE-SIGNED.apk
+          unzip -t out/GTAV-GOLD-BAKED-CACHE-SIGNED.apk >/dev/null
+          sha256sum out/GTAV-GOLD-BAKED-CACHE-SIGNED.apk > out/GTAV-GOLD-BAKED-CACHE-SIGNED.apk.sha256
+          cp src/native-renderer/build/libgtav_native_renderer.so out/
+          sha256sum out/libgtav_native_renderer.so > out/libgtav_native_renderer.so.sha256
+      - name: Upload test build
+        uses: actions/upload-artifact@v4
+        with:
+          name: GTAV-GOLD-BAKED-CACHE-${{ github.run_number }}
+          compression-level: 0
+          path: |
+            out/GTAV-GOLD-BAKED-CACHE-SIGNED.apk
+            out/GTAV-GOLD-BAKED-CACHE-SIGNED.apk.sha256
+            out/libgtav_native_renderer.so
+            out/libgtav_native_renderer.so.sha256
