@@ -1,0 +1,35 @@
+name: Build from Gold APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "patch/**"
+      - "scripts/**"
+      - ".github/workflows/build-gold.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Verify LFS checkout
+        run: |
+          git lfs pull
+          test "$(stat -c%s GTAV-GOLD.apk)" -gt 200000000
+          echo "c7db44f0decdbe07ca2302ac4a4c75728eb085530f4ea1b2da9639b35e05fd93  GTAV-GOLD.apk" | sha256sum -c -
+
+      - name: Build from immutable Gold baseline
+        run: |
+          chmod +x scripts/build-from-gold.sh
+          scripts/build-from-gold.sh GTAV-GOLD.apk GTAV-GOLD-BUILD.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: GTAV-GOLD-BUILD
+          path: GTAV-GOLD-BUILD.apk
+          compression-level: 0
